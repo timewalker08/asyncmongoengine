@@ -1,0 +1,7 @@
+log:
+  level: "info"
+
+projects:
+  asyncmongoengine:
+    docker_compose_files:
+      - "docker-compose.yaml"
