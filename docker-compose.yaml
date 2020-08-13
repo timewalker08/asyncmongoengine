@@ -1,4 +1,7 @@
 version: "3.6"
+networks:
+  spider-net-dev:
+    external: true
 
 services:
   asyncmongoengine:
@@ -6,3 +9,15 @@ services:
     build: ci/
     volumes:
       - ./:/app/
+    networks: 
+      spider-net-dev:
+        ipv4_address: 192.168.60.100
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    ports:
+      - 27018:27017
+    networks: 
+      spider-net-dev:
+        ipv4_address: 192.168.60.101

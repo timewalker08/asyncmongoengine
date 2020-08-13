@@ -1,4 +1,5 @@
 
+from asyncmongoengine.base.common import _document_registry
 from asyncmongoengine.base.errors import InvalidDocumentError
 from asyncmongoengine.base.fields import BaseField
 
@@ -15,6 +16,9 @@ class DocumentMetaclass(type):
         metaclass = attrs.get("my_metaclass")
         if metaclass and issubclass(metaclass, DocumentMetaclass):
             return super_new(mcs, name, bases, attrs)
+
+        if "meta" in attrs:
+            attrs["_meta"] = attrs.pop("meta")
 
         doc_fields = {}
         field_names = {}
@@ -56,6 +60,8 @@ class DocumentMetaclass(type):
         # Create the new_class
         new_class = super_new(mcs, name, bases, attrs)
 
+        _document_registry[new_class._class_name] = new_class
+
         return new_class
 
 
@@ -95,6 +101,14 @@ class TopLevelDocumentMetaclass(DocumentMetaclass):
 
         # Set flag marking as document class - as opposed to an object mixin
         attrs["_is_document"] = True
+
+        # Set default collection name
+        if "collection" not in attrs["_meta"]:
+            attrs["_meta"]["collection"] = (
+                "".join("_%s" % c if c.isupper() else c for c in name)
+                .strip("_")
+                .lower()
+            )
 
         new_class = super_new(mcs, name, bases, attrs)
 

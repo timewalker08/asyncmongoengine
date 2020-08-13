@@ -1,5 +1,10 @@
 
-from asyncmongoengine.base.errors import FieldDoesNotExist, ValidationError
+from bson import SON, DBRef, ObjectId
+
+from asyncmongoengine.base.common import get_document
+from asyncmongoengine.base.errors import (FieldDoesNotExist,
+                                          InvalidDocumentError,
+                                          ValidationError)
 
 NON_FIELD_ERRORS = "__all__"
 
@@ -62,6 +67,36 @@ class BaseDocument(object):
         self._initialised = True
         self._created = _created
 
+    def __contains__(self, name):
+        try:
+            val = getattr(self, name)
+            return val is not None
+        except AttributeError:
+            return False
+
+    def __iter__(self):
+        return iter(self._fields_ordered)
+        
+    def __getitem__(self, name):
+        """Dictionary-style field access, return a field's value if present.
+        """
+        try:
+            if name in self._fields_ordered:
+                return getattr(self, name)
+        except AttributeError:
+            pass
+        raise KeyError(name)
+
+    def __setitem__(self, name, value):
+        """Dictionary-style field access, set a field's value.
+        """
+        # Ensure that the field exists before settings its value
+        if not self._dynamic and name not in self._fields:
+            raise KeyError(name)
+        return setattr(self, name, value)
+
+    def __len__(self):
+        return len(self._data)
 
     def validate(self, clean=True):
         """Ensure that all fields' values are valid and that required fields
@@ -80,7 +115,7 @@ class BaseDocument(object):
 
         fields = [
             (
-                self._fields.get(name, self._dynamic_fields.get(name)),
+                self._fields.get(name),
                 self._data.get(name),
             )
             for name in self._fields_ordered
@@ -98,6 +133,10 @@ class BaseDocument(object):
                 errors[field.name] = ValidationError(
                     "Field is required", field_name=field.name
                 )
+
+        for k, v in errors.items():
+            print(k)
+            print(v)
 
         if errors:
             pk = "None"
@@ -118,3 +157,98 @@ class BaseDocument(object):
         field defined by NON_FIELD_ERRORS.
         """
         pass
+
+    def to_mongo(self, fields=None):
+        fields = fields or []
+
+        data = SON()
+        data["_id"] = None
+        data["_cls"] = self._class_name
+
+        # only root fields ['test1.a', 'test2'] => ['test1', 'test2']
+        root_fields = {f.split(".")[0] for f in fields}
+
+        for field_name in self:
+            if root_fields and field_name not in root_fields:
+                continue
+
+            value = self._data.get(field_name, None)
+            field = self._fields.get(field_name)
+
+            if value is not None:
+                value = field.to_mongo(value)
+
+            data[field.db_field] = value
+
+        return data
+
+    @classmethod
+    def _get_collection_name(cls):
+        """Return the collection name for this class. None for abstract
+        class.
+        """
+        return cls._meta.get("collection", None)
+
+    @classmethod
+    def _from_son(cls, son, only_fields=None, created=False):
+        """Create an instance of a Document (subclass) from a PyMongo SON."""
+        if not only_fields:
+            only_fields = []
+
+        if son and not isinstance(son, dict):
+            raise ValueError(
+                "The source SON object needs to be of type 'dict' but a '%s' was found"
+                % type(son)
+            )
+
+        # Get the class name from the document, falling back to the given
+        # class if unavailable
+        class_name = son.get("_cls", cls._class_name)
+
+        # Convert SON to a data dict, making sure each key is a string and
+        # corresponds to the right db field.
+        data = {}
+        for key, value in son.items():
+            key = str(key)
+            key = cls._db_field_map.get(key, key)
+            data[key] = value
+
+        # Return correct subclass for document type
+        if class_name != cls._class_name:
+            cls = get_document(class_name)
+
+        errors_dict = {}
+
+        fields = cls._fields
+
+        for field_name, field in fields.items():
+            if field.db_field in data:
+                value = data[field.db_field]
+                try:
+                    data[field_name] = (
+                        value if value is None else field.to_python(value)
+                    )
+                    if field_name != field.db_field:
+                        del data[field.db_field]
+                except (AttributeError, ValueError) as e:
+                    errors_dict[field_name] = e
+
+        if errors_dict:
+            errors = "\n".join(
+                ["Field '{}' - {}".format(k, v) for k, v in errors_dict.items()]
+            )
+            msg = "Invalid data to create a `{}` instance.\n{}".format(
+                cls._class_name, errors,
+            )
+            raise InvalidDocumentError(msg)
+
+        # In STRICT documents, remove any keys that aren't in cls._fields
+        # if cls.STRICT:
+        #    data = {k: v for k, v in data.items() if k in cls._fields}
+
+        obj = cls(
+            __auto_convert=False, _created=created, __only_fields=only_fields, **data
+        )
+        obj._changed_fields = []
+
+        return obj

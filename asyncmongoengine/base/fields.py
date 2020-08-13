@@ -1,5 +1,5 @@
 
-
+from asyncmongoengine.base.errors import ValidationError
 
 __all__ = ("BaseField", "ComplexBaseField", "ObjectIdField")
 
@@ -17,7 +17,6 @@ class BaseField(object):
         default=None,
         unique=False,
         unique_with=None,
-        primary_key=False,
         validation=None,
         choices=None,
         null=False,
@@ -35,7 +34,6 @@ class BaseField(object):
         :param unique: Is the field value unique or not.  Defaults to False.
         :param unique_with: (optional) The other field this field should be
             unique with.
-        :param primary_key: Mark this field as the primary key. Defaults to False.
         :param validation: (optional) A callable to validate the value of the
             field.  The callable takes the value as parameter and should raise
             a ValidationError if validation fails
@@ -50,13 +48,11 @@ class BaseField(object):
             existing attributes. Common metadata includes `verbose_name` and
             `help_text`.
         """
-        self.db_field = db_field if not primary_key else "_id"
-
-        self.required = required or primary_key
+        self.db_field = db_field
+        self.required = required
         self.default = default
         self.unique = bool(unique or unique_with)
         self.unique_with = unique_with
-        self.primary_key = primary_key
         self.validation = validation
         self.choices = choices
         self.null = null
@@ -119,3 +115,89 @@ class BaseField(object):
         """Perform validation on a value."""
         pass
     
+    def _validate(self, value, **kwargs):
+        # Check the Choices Constraint
+        #if self.choices:
+        #    self._validate_choices(value)
+
+        self.validate(value, **kwargs)
+
+    def error(self, message="", errors=None, field_name=None):
+        """Raise a ValidationError."""
+        field_name = field_name if field_name else self.name
+        raise ValidationError(message, errors=errors, field_name=field_name)
+
+
+class ComplexBaseField(BaseField):
+    """Handles complex fields, such as lists / dictionaries.
+
+    Allows for nesting of embedded documents inside complex types.
+    Handles the lazy dereferencing of a queryset by lazily dereferencing all
+    items in a list / dict rather than one at a time.
+
+    .. versionadded:: 0.5
+    """
+
+    field = None
+
+    def __get__(self, instance, owner):
+        """Descriptor to automatically dereference references."""
+        if instance is None:
+            # Document class being used rather than a document object
+            return self
+
+        value = super().__get__(instance, owner)
+
+        # Convert lists / values so we can watch for any changes on them
+        if isinstance(value, (list, tuple)):
+            instance._data[self.name] = value
+        elif isinstance(value, dict):
+            instance._data[self.name] = value
+
+        return value
+
+    def to_python(self, value):
+        """Convert a MongoDB-compatible type to a Python type."""
+        pass
+
+    def to_mongo(self, value, use_db_field=True, fields=None):
+        """Convert a Python type to a MongoDB-compatible type."""
+        pass
+
+    def validate(self, value):
+        """If field is provided ensure the value is valid."""
+        errors = {}
+        if self.field:
+            if hasattr(value, "items"):
+                sequence = value.items()
+            else:
+                sequence = enumerate(value)
+            for k, v in sequence:
+                try:
+                    self.field._validate(v)
+                except ValidationError as error:
+                    errors[k] = error.errors or error
+                except (ValueError, AssertionError) as error:
+                    errors[k] = error
+
+            if errors:
+                field_class = self.field.__class__.__name__
+                self.error(
+                    "Invalid {} item ({})".format(field_class, value), errors=errors
+                )
+        # Don't allow empty values if required
+        if self.required and not value:
+            self.error("Field is required and cannot be empty")
+
+    def prepare_query_value(self, op, value):
+        return self.to_mongo(value)
+
+    def lookup_member(self, member_name):
+        if self.field:
+            return self.field.lookup_member(member_name)
+        return None
+
+    def _set_owner_document(self, owner_document):
+        if self.field:
+            self.field.owner_document = owner_document
+        self._owner_document = owner_document
