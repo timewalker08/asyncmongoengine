@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "asyncmongoengine"
+version = "0.0.2"
+authors = [
+  { name="Antony Lin", email="timewalker08@outlook.com" },
+]
+description = "A lightweight asyncio support package based on MongoEngine and Motor."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "mongoengine ~= 0.24.2",
+    "motor ~= 3.1.1",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/timewalker08/asyncmongoengine"
+"Bug Tracker" = "https://github.com/timewalker08/asyncmongoengine/issues"

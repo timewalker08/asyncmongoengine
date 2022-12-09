@@ -1,0 +1,3 @@
+
+client = None
+db = None
