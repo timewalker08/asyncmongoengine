@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  pythonenv:
+    container_name: "asyncmongoengineenv"
+    build: .
+    volumes:
+      - .:/app
+  mongo:
+    container_name: "mongodb"
+    image: "mongo:6.0.3"
+    ports:
+      - "29017:27017"

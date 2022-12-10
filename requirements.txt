@@ -1,0 +1,2 @@
+mongoengine ~= 0.24.2
+motor ~= 3.1.1
