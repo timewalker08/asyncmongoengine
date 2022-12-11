@@ -1,2 +1,2 @@
 # asyncmongoengine
-Add async support to mongoengine.
+A lightweight asyncio compatible mongoengine based on MongoEngine and Motor.

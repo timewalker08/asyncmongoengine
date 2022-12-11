@@ -27,8 +27,9 @@ class Dog(Animal):
 
 class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
 
-    def setUp(self):
+    async def asyncSetUp(self):
         connection.client = motor.motor_asyncio.AsyncIOMotorClient("mongodb")
+        await connection.client.drop_database(DBName)
         connection.db = connection.client[DBName]
         apply_patch()
 
