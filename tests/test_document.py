@@ -2,9 +2,7 @@ import unittest
 
 import motor.motor_asyncio
 from mongoengine.document import Document, EmbeddedDocument
-from mongoengine.fields import (EmbeddedDocumentField,
-                                EmbeddedDocumentListField, IntField,
-                                StringField)
+from mongoengine import fields
 
 from asyncmongoengine import connection
 from asyncmongoengine.document import apply_patch
@@ -13,12 +11,12 @@ DBName = "main"
 
 
 class User(Document):
-    name = StringField()
-    age = IntField()
+    name = fields.StringField()
+    age = fields.IntField()
 
 class Animal(Document):
     meta = {"allow_inheritance": True}
-    type = StringField()
+    type = fields.StringField()
 
 class Cat(Animal):
     pass
@@ -27,11 +25,12 @@ class Dog(Animal):
     pass
 
 class Address(EmbeddedDocument):
-    city = StringField()
+    city = fields.StringField()
 
 class WorkLocation(Document):
-    name = StringField()
-    address = EmbeddedDocumentField(Address)
+    name = fields.StringField()
+    address = fields.EmbeddedDocumentField(Address)
+
 
 class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
 
