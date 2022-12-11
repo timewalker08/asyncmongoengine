@@ -1,8 +1,10 @@
 import unittest
 
 import motor.motor_asyncio
-from mongoengine.document import Document
-from mongoengine.fields import StringField, IntField
+from mongoengine.document import Document, EmbeddedDocument
+from mongoengine.fields import (EmbeddedDocumentField,
+                                EmbeddedDocumentListField, IntField,
+                                StringField)
 
 from asyncmongoengine import connection
 from asyncmongoengine.document import apply_patch
@@ -16,7 +18,6 @@ class User(Document):
 
 class Animal(Document):
     meta = {"allow_inheritance": True}
-
     type = StringField()
 
 class Cat(Animal):
@@ -24,6 +25,13 @@ class Cat(Animal):
 
 class Dog(Animal):
     pass
+
+class Address(EmbeddedDocument):
+    city = StringField()
+
+class WorkLocation(Document):
+    name = StringField()
+    address = EmbeddedDocumentField(Address)
 
 class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
 
@@ -50,3 +58,10 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         animal = Animal(type="Animal")
         animal_saved = await animal.save_async()
         self.assertTrue(isinstance(animal_saved, Animal))
+
+    async def test_embededdocument(self):
+        location = WorkLocation(name="Office", address=Address(city="Shanghai"))
+        location_saved = await location.save_async()
+        self.assertIsNotNone(location_saved)
+        self.assertTrue(isinstance(location_saved, WorkLocation))
+        self.assertTrue(isinstance(location_saved.address, Address))
