@@ -35,7 +35,7 @@ class WorkLocation(Document):
 class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
-        connection.client = motor.motor_asyncio.AsyncIOMotorClient("mongodb")
+        connection.client = motor.motor_asyncio.AsyncIOMotorClient("mongodb", 27017, username="root", password="password")
         await connection.client.drop_database(DBName)
         connection.db = connection.client[DBName]
         apply_patch()
@@ -64,3 +64,19 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(location_saved)
         self.assertTrue(isinstance(location_saved, WorkLocation))
         self.assertTrue(isinstance(location_saved.address, Address))
+
+    async def test_find(self):
+        user1 = User(name="Julius Caesar", age=56)
+        user1 = await user1.save_async()
+
+        user2 = User(name="Mark Antony", age=48)
+        user2 = await user2.save_async()
+
+        users = set([user1, user2])
+
+        async for user in User.find({}):
+            self.assertIsNotNone(user)
+
+        async for user in User.find_async({}):
+            self.assertIsNotNone(user)
+            self.assertTrue(user in users)
