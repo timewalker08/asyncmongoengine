@@ -1,11 +1,12 @@
 
-from typing import Any, Optional
+from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
+from mongoengine.base import get_document
 from mongoengine.document import Document
+from pymongo import CursorType
+from pymongo.client_session import ClientSession
 
 from asyncmongoengine import connection
-from mongoengine.base import get_document
-from pymongo import CursorType
 
 
 def add(a, b):
@@ -35,7 +36,7 @@ async def find_one_async(cls, filter: Optional[Any] = None, *args: Any, **kwargs
     collection = cls._get_motor_collection()
     document = await collection.find_one(filter, *args, **kwargs)
     if not document:
-        raise cls.DoesNotExist()
+        return None
     return cls._build_document(document)
 
 
@@ -51,11 +52,38 @@ async def find_async(cls, *args, **kwargs):
         yield cls._build_document(doc)
 
 
+async def find_one_and_update_async(
+    cls,
+    filter: Mapping[str, Any],
+    update: Union[Mapping[str, Any], Sequence[Mapping[str, Any]]],
+    projection: Optional[Union[Mapping[str, Any], Iterable[str]]] = None,
+    sort: Optional[Sequence[Tuple[str,
+                                  Union[int, str, Mapping[str, Any]]]]] = None,
+    upsert: bool = False,
+    return_document: bool = False,
+    array_filters: Optional[Sequence[Mapping[str, Any]]] = None,
+    hint: Optional[Union[str, Sequence[Tuple[str,
+                                             Union[int, str, Mapping[str, Any]]]]]] = None,
+    session: Optional[ClientSession] = None,
+    let: Optional[Mapping[str, Any]] = None,
+    comment: Optional[Any] = None,
+    **kwargs: Any
+):
+    collection = cls._get_motor_collection()
+    doc = await collection.find_one_and_update(filter, update, projection, sort, upsert, return_document, array_filters, hint,
+                                               session, let, comment, **kwargs)
+    if not doc:
+        return None
+    return cls._build_document(doc)
+
+
 def apply_patch():
     setattr(Document, "_get_motor_collection",
             classmethod(_get_motor_collection))
     setattr(Document, "find_one_async", classmethod(find_one_async))
     setattr(Document, "_build_document", classmethod(_build_document))
+    setattr(Document, "find_one_and_update_async",
+            classmethod(find_one_and_update_async))
     setattr(Document, "find", classmethod(find))
     setattr(Document, "find_async", classmethod(find_async))
     setattr(Document, 'save_async', save_async)

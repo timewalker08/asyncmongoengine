@@ -12,6 +12,7 @@ DBName = "main"
 
 class User(Document):
     name = fields.StringField()
+    gender = fields.StringField()
     age = fields.IntField()
 
 class Animal(Document):
@@ -80,3 +81,23 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         async for user in User.find_async({}):
             self.assertIsNotNone(user)
             self.assertTrue(user in users)
+
+        users = [user async for user in User.find_async({"name": "Julius Caesar"})]
+        self.assertEqual(len(users), 1)
+
+        users = [user async for user in User.find_async({"name": {"$in": ["Julius Caesar", "Mark Antony"]}})]
+        self.assertEqual(len(users), 2)
+
+    async def test_find_one_and_update(self):
+        user = User(name="Julius Caesar", age=56)
+        await user.save_async()
+
+        user = await User.find_one_and_update_async(filter={"name": "Julius Caesar"}, update={"$set": {"age": 60}})
+        self.assertEqual(user.name, "Julius Caesar")
+        self.assertEqual(user.age, 56)
+
+        user = await User.find_one_async({"name": "Julius Caesar"})
+        self.assertEqual(user.age, 60)
+
+        user = await User.find_one_async({"name": "No Body"})
+        self.assertIsNone(user)
