@@ -14,6 +14,7 @@ class User(Document):
     name = fields.StringField()
     gender = fields.StringField()
     age = fields.IntField()
+    children = fields.ListField(fields.StringField())
 
 class Animal(Document):
     meta = {"allow_inheritance": True}
@@ -46,6 +47,9 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         user_saved = await user.save_async()
         self.assertIsNotNone(user_saved)
         self.assertTrue(isinstance(user_saved, User))
+        user_saved.age = 60
+        user_saved = await user_saved.save_async()
+        self.assertEqual(60, user_saved.age)
 
         dog = Dog(type="Dog")
         dog_saved = await dog.save_async()
@@ -88,6 +92,12 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         users = [user async for user in User.find_async({"name": {"$in": ["Julius Caesar", "Mark Antony"]}})]
         self.assertEqual(len(users), 2)
 
+        user = User(name="Julius Caesar", age=56, children=["Caesarion", "Julia Caesaris"])
+        user = await user.save_async()
+        users = [user async for user in User.find_async({"children": "Caesarion"})]
+        print(users[0].children)
+        self.assertEqual(len(users), 1)
+
     async def test_find_one_and_update(self):
         user = User(name="Julius Caesar", age=56)
         await user.save_async()
@@ -101,3 +111,9 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
 
         user = await User.find_one_async({"name": "No Body"})
         self.assertIsNone(user)
+
+    async def test_count_async(self):
+        await User(name="Julius Caesar", age=56).save_async()
+        await User(name="Mark Antony", age=48).save_async()
+        count = await User.count_async({})
+        self.assertEqual(2, count)

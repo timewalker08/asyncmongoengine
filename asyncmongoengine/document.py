@@ -27,9 +27,14 @@ def _build_document(cls, doc):
 async def save_async(self):
     collection = type(self)._get_motor_collection()
     doc = self.to_mongo()
-    result = await collection.insert_one(doc)
-    inserted_id = result.inserted_id
-    return await type(self).find_one_async({"_id": inserted_id})
+    _id = doc.pop("_id", None)
+    if not _id:
+        result = await collection.insert_one(doc)
+        inserted_id = result.inserted_id
+        return await type(self).find_one_async({"_id": inserted_id})
+    else:
+        await collection.replace_one({"_id": _id}, doc)
+        return await type(self).find_one_async({"_id": _id})
 
 
 async def find_one_async(cls, filter: Optional[Any] = None, *args: Any, **kwargs: Any):
@@ -77,6 +82,11 @@ async def find_one_and_update_async(
     return cls._build_document(doc)
 
 
+async def count_async(cls, filter: Mapping[str, Any], session: Optional[ClientSession] = None, comment: Optional[Any] = None, **kwargs: Any):
+    collection = cls._get_motor_collection()
+    return await collection.count_documents(filter, session, comment, **kwargs)
+
+
 def apply_patch():
     setattr(Document, "_get_motor_collection",
             classmethod(_get_motor_collection))
@@ -87,3 +97,4 @@ def apply_patch():
     setattr(Document, "find", classmethod(find))
     setattr(Document, "find_async", classmethod(find_async))
     setattr(Document, 'save_async', save_async)
+    setattr(Document, 'count_async', classmethod(count_async))
