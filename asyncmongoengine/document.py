@@ -87,6 +87,17 @@ async def count_async(cls, filter: Mapping[str, Any], session: Optional[ClientSe
     return await collection.count_documents(filter, session, comment, **kwargs)
 
 
+async def update_many_async(cls, filter: Mapping[str, Any], update: Union[Mapping[str, Any], Sequence[Mapping[str, Any]]], upsert: bool = False, array_filters: Optional[Sequence[Mapping[str, Any]]] = None, bypass_document_validation: Optional[bool] = None, collation=None, hint: Optional[Union[str, Sequence[Tuple[str, Union[int, str, Mapping[str, Any]]]]]] = None, session: Optional[ClientSession] = None, let: Optional[Mapping[str, Any]] = None, comment: Optional[Any] = None):
+    collection = cls._get_motor_collection()
+    res = await collection.update_many(filter, update, upsert, array_filters, bypass_document_validation, collation, hint, session, let, comment)
+    return res
+
+async def delete_many_async(cls, filter: Mapping[str, Any], collation = None, hint: Optional[Union[str, Sequence[Tuple[str, Union[int, str, Mapping[str, Any]]]]]] = None, session: Optional[ClientSession] = None, let: Optional[Mapping[str, Any]] = None, comment: Optional[Any] = None):
+    collection = cls._get_motor_collection()
+    res = await collection.delete_many(filter, collation, hint, session, let, comment)
+    return res
+
+
 def apply_patch():
     setattr(Document, "_get_motor_collection",
             classmethod(_get_motor_collection))
@@ -96,5 +107,7 @@ def apply_patch():
             classmethod(find_one_and_update_async))
     setattr(Document, "find", classmethod(find))
     setattr(Document, "find_async", classmethod(find_async))
-    setattr(Document, 'save_async', save_async)
-    setattr(Document, 'count_async', classmethod(count_async))
+    setattr(Document, "save_async", save_async)
+    setattr(Document, "count_async", classmethod(count_async))
+    setattr(Document, "update_many_async", classmethod(update_many_async))
+    setattr(Document, "delete_many_async", classmethod(delete_many_async))

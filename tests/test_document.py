@@ -1,8 +1,9 @@
 import unittest
 
 import motor.motor_asyncio
-from mongoengine.document import Document, EmbeddedDocument
+import pymongo
 from mongoengine import fields
+from mongoengine.document import Document, EmbeddedDocument
 
 from asyncmongoengine import connection
 from asyncmongoengine.document import apply_patch
@@ -117,3 +118,26 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         await User(name="Mark Antony", age=48).save_async()
         count = await User.count_async({})
         self.assertEqual(2, count)
+
+    async def test_sort(self):
+        user1 = await User(name="Julius Caesar", age=56).save_async()
+        user2 = await User(name="Mark Antony", age=48).save_async()
+        expected_users = [user2, user1]
+        index = 0
+        async for user in User.find_async({}, sort=[('age', pymongo.ASCENDING)]):
+            self.assertEqual(expected_users[index], user)
+            index += 1
+
+    async def test_update_many_async(self):
+        user1 = await User(name="Julius Caesar", age=56).save_async()
+        user2 = await User(name="Mark Antony", age=48).save_async()
+        await User.update_many_async({}, {"$set": {"age": 60}})
+        async for user in User.find_async({}):
+            self.assertEqual(60, user.age)
+
+    async def test_delete_many_async(self):
+        user1 = await User(name="Julius Caesar", age=56).save_async()
+        user2 = await User(name="Mark Antony", age=48).save_async()
+        await User.delete_many_async({})
+        count = await User.count_async({})
+        self.assertEqual(0, count)
