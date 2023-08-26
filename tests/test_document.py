@@ -198,7 +198,15 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
             {"$match": {"offices.capacity": {"$gt": 100}}},
             {"$sort": {"offices.capacity": 1}},
             {"$skip": 0},
-            {"$limit": 2},
+            {"$limit": 20},
+        ]
+        async for doc in Company.aggregate_async(pipeline):
+            print(doc)
+
+        pipeline = [
+            {"$unwind": "$offices"},
+            {"$match": {"offices.capacity": {"$gt": 100}}},
+            {"$count": "total"}
         ]
         async for doc in Company.aggregate_async(pipeline):
             print(doc)
