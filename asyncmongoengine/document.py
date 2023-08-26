@@ -97,6 +97,11 @@ async def delete_many_async(cls, filter: Mapping[str, Any], collation = None, hi
     res = await collection.delete_many(filter, collation, hint, session, let, comment)
     return res
 
+async def aggregate_async(cls, pipeline, *args, **kwargs):
+    collection = cls._get_motor_collection()
+    cursor = collection.aggregate(pipeline, *args, **kwargs)
+    async for doc in cursor:
+        yield doc
 
 def apply_patch():
     setattr(Document, "_get_motor_collection",
@@ -111,3 +116,4 @@ def apply_patch():
     setattr(Document, "count_async", classmethod(count_async))
     setattr(Document, "update_many_async", classmethod(update_many_async))
     setattr(Document, "delete_many_async", classmethod(delete_many_async))
+    setattr(Document, "aggregate_async", classmethod(aggregate_async))

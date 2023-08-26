@@ -17,28 +17,45 @@ class User(Document):
     age = fields.IntField()
     children = fields.ListField(fields.StringField())
 
+
 class Animal(Document):
     meta = {"allow_inheritance": True}
     type = fields.StringField()
 
+
 class Cat(Animal):
     pass
+
 
 class Dog(Animal):
     pass
 
+
 class Address(EmbeddedDocument):
     city = fields.StringField()
+
 
 class WorkLocation(Document):
     name = fields.StringField()
     address = fields.EmbeddedDocumentField(Address)
 
 
-class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
+class CompanyOffice(EmbeddedDocument):
+    name = fields.StringField()
+    capacity = fields.IntField()
+    address = fields.EmbeddedDocumentField(Address)
 
+
+class Company(Document):
+    name = fields.StringField()
+    offices = fields.EmbeddedDocumentListField(CompanyOffice)
+
+
+class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        connection.client = motor.motor_asyncio.AsyncIOMotorClient("mongodb", 27017, username="root", password="password")
+        connection.client = motor.motor_asyncio.AsyncIOMotorClient(
+            "mongodb", 27017, username="root", password="password"
+        )
         await connection.client.drop_database(DBName)
         connection.db = connection.client[DBName]
         apply_patch()
@@ -90,10 +107,17 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         users = [user async for user in User.find_async({"name": "Julius Caesar"})]
         self.assertEqual(len(users), 1)
 
-        users = [user async for user in User.find_async({"name": {"$in": ["Julius Caesar", "Mark Antony"]}})]
+        users = [
+            user
+            async for user in User.find_async(
+                {"name": {"$in": ["Julius Caesar", "Mark Antony"]}}
+            )
+        ]
         self.assertEqual(len(users), 2)
 
-        user = User(name="Julius Caesar", age=56, children=["Caesarion", "Julia Caesaris"])
+        user = User(
+            name="Julius Caesar", age=56, children=["Caesarion", "Julia Caesaris"]
+        )
         user = await user.save_async()
         users = [user async for user in User.find_async({"children": "Caesarion"})]
         print(users[0].children)
@@ -103,7 +127,9 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         user = User(name="Julius Caesar", age=56)
         await user.save_async()
 
-        user = await User.find_one_and_update_async(filter={"name": "Julius Caesar"}, update={"$set": {"age": 60}})
+        user = await User.find_one_and_update_async(
+            filter={"name": "Julius Caesar"}, update={"$set": {"age": 60}}
+        )
         self.assertEqual(user.name, "Julius Caesar")
         self.assertEqual(user.age, 56)
 
@@ -124,7 +150,7 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         user2 = await User(name="Mark Antony", age=48).save_async()
         expected_users = [user2, user1]
         index = 0
-        async for user in User.find_async({}, sort=[('age', pymongo.ASCENDING)]):
+        async for user in User.find_async({}, sort=[("age", pymongo.ASCENDING)]):
             self.assertEqual(expected_users[index], user)
             index += 1
 
@@ -141,3 +167,38 @@ class TestAsyncDocumentMethod(unittest.IsolatedAsyncioTestCase):
         await User.delete_many_async({})
         count = await User.count_async({})
         self.assertEqual(0, count)
+
+    async def test_aggregate_async(self):
+        user1 = await User(name="Julius Caesar", age=56).save_async()
+        user2 = await User(name="Mark Antony", age=48).save_async()
+        pipeline = [{"$project": {"name": {"$toUpper": "$name"}}}]
+        async for doc in User.aggregate_async(pipeline):
+            print(doc)
+
+        await Company(
+            name="C1",
+            offices=[
+                CompanyOffice(name="嘉里中心", capacity=200),
+                CompanyOffice(name="恒隆广场", capacity=100),
+                CompanyOffice(name="国金中心", capacity=100),
+                CompanyOffice(name="天荟", capacity=300),
+            ],
+        ).save_async()
+        await Company(
+            name="C2",
+            offices=[
+                CompanyOffice(name="嘉里中心", capacity=100),
+                CompanyOffice(name="恒隆广场", capacity=150),
+                CompanyOffice(name="国金中心", capacity=50),
+                CompanyOffice(name="天荟", capacity=200),
+            ],
+        ).save_async()
+        pipeline = [
+            {"$unwind": "$offices"},
+            {"$match": {"offices.capacity": {"$gt": 100}}},
+            {"$sort": {"offices.capacity": 1}},
+            {"$skip": 0},
+            {"$limit": 2},
+        ]
+        async for doc in Company.aggregate_async(pipeline):
+            print(doc)
